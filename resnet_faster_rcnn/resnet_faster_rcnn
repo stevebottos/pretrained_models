@@ -1,0 +1,127 @@
+model {{
+  faster_rcnn {{
+    num_classes: {num_classes}
+    image_resizer {{
+      fixed_shape_resizer {{
+        height: 600
+        width: 800
+      }}
+    }}
+    feature_extractor {{
+      type: 'faster_rcnn_resnet101'
+      first_stage_features_stride: 16
+    }}
+    first_stage_anchor_generator {{
+      grid_anchor_generator {{
+        scales: [0.25, 0.5, 1.0, 2.0]
+        aspect_ratios: [0.5, 1.0, 2.0]
+        height_stride: 16
+        width_stride: 16
+      }}
+    }}
+    first_stage_box_predictor_conv_hyperparams {{
+      op: CONV
+      regularizer {{
+        l2_regularizer {{
+          weight: 0.00004
+        }}
+      }}
+      initializer {{
+        truncated_normal_initializer {{
+          stddev: 0.01
+        }}
+      }}
+    }}
+    first_stage_nms_score_threshold: 0.0
+    first_stage_nms_iou_threshold: 0.7
+    first_stage_max_proposals: 300
+    first_stage_localization_loss_weight: 2.0
+    first_stage_objectness_loss_weight: 1.0
+    initial_crop_size: 14
+    maxpool_kernel_size: 2
+    maxpool_stride: 2
+    second_stage_box_predictor {{
+      mask_rcnn_box_predictor {{
+        use_dropout: false
+        dropout_keep_probability: 1.0
+        fc_hyperparams {{
+          op: FC
+          regularizer {{
+            l2_regularizer {{
+              weight: 0.00004
+            }}
+          }}
+          initializer {{
+            variance_scaling_initializer {{
+              factor: 1.0
+              uniform: true
+              mode: FAN_AVG
+            }}
+          }}
+        }}
+      }}
+    }}
+    second_stage_post_processing {{
+      batch_non_max_suppression {{
+        score_threshold: 0.0
+        iou_threshold: 0.6
+        max_detections_per_class: 30
+        max_total_detections: 50
+      }}
+      score_converter: SOFTMAX
+    }}
+    second_stage_localization_loss_weight: 2.0
+    second_stage_classification_loss_weight: 1.0
+  }}
+}}
+
+train_config: {{
+  batch_size: {batch_size}
+  optimizer {{
+    rms_prop_optimizer: {{
+      learning_rate: {{
+        exponential_decay_learning_rate {{
+          initial_learning_rate: 0.0003
+          decay_steps: 25000
+          decay_factor: 0.95
+        }}
+      }}
+      momentum_optimizer_value: 0.9
+      decay: 0.9
+      epsilon: 1.0
+    }}
+  }}
+  fine_tune_checkpoint: "{model_checkpoint}"
+  from_detection_checkpoint: true
+  num_steps: {num_steps}
+  max_number_of_boxes: 100
+}}
+
+train_input_reader: {{
+  label_map_path: "{label_map_path}"
+  tf_record_input_reader {{
+    input_path: "{record_dir}/train.record-00000-of-00001"
+  }}
+  shuffle: false
+  # num_prefetch_batches: 0
+  # num_readers: 1
+  # queue_capacity: 5
+}}
+
+eval_config: {{
+  num_examples: 30
+  metrics_set: "coco_detection_metrics"
+  # Note: The below line limits the evaluation process to n evaluations.
+  # Remove the below line to evaluate indefinitely.
+  max_evals: 1
+  save_graph: false
+}}
+
+eval_input_reader: {{
+  label_map_path: "{label_map_path}"
+  tf_record_input_reader {{
+    input_path: "{record_dir}/val.record-00000-of-00001"
+  }}
+  shuffle: false
+  num_readers: 1
+}}
